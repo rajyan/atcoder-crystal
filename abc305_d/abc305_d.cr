@@ -26,7 +26,7 @@ delta = -> (i: Int64, t: Int64) {
 }
 
 q = read_line.to_i
-q.times.each do
+q.times do
   l, r = read_line.split.map(&.to_i64)
   dump l, r
   li = a.bsearch_index { |a_| l < a_ } || n - 1

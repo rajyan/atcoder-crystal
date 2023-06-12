@@ -5,14 +5,14 @@ end
 
 n, m, k = read_line.split.map(&.to_i64)
 edges = Array.new(n) { [] of Int32 }
-m.times.each do
+m.times do
   a, b = read_line.split.map(&.to_i)
   edges[a - 1] << b - 1
   edges[b - 1] << a - 1
 end
 
 q = AtCoder::PriorityQueue(Array(Int64)).new { |a, b| a[1] <= b[1] }
-k.times.each do
+k.times do
   p, h = read_line.split.map(&.to_i64)
   q << [p - 1, h]
 end
