@@ -2,9 +2,10 @@
 
 url="$1"
 dir="${url##*/}"
-file="$dir/$dir.cr"
+file="$dir.cr"
 
 mkdir "$dir"
+pushd "$dir"
 touch "$file"
 cat <<EOF >> "$file"
 macro dump(*vs)
@@ -14,4 +15,5 @@ end
 
 EOF
 rmine "$PWD/$file"
-/home/linuxbrew/.linuxbrew/bin/oj d -d "$dir/test" "$url"
+/home/linuxbrew/.linuxbrew/bin/oj d "$url"
+popd
