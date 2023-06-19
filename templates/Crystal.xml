@@ -1,0 +1,52 @@
+<templateSet group="Crystal">
+  <template name="dump" value="macro dump(*vs)&#10;  o={% for v in vs %}{{v.stringify}} + &quot;=#{{{v}}}\n&quot;{% end %}&#10;  STDERR.puts o&#10;end" description="" toReformat="true" toShortenFQNames="true">
+    <context>
+      <option name="CSS" value="false" />
+      <option name="CUCUMBER_FEATURE_FILE" value="false" />
+      <option name="CoffeeScript" value="false" />
+      <option name="ECMAScript6" value="false" />
+      <option name="HAML" value="false" />
+      <option name="HTML" value="false" />
+      <option name="HTTP_CLIENT_ENVIRONMENT" value="false" />
+      <option name="JAVA_SCRIPT" value="false" />
+      <option name="JSON" value="false" />
+      <option name="LIQUID" value="false" />
+      <option name="OTHER" value="true" />
+      <option name="RBS_CODE" value="false" />
+      <option name="REQUEST" value="false" />
+      <option name="RHTML" value="false" />
+      <option name="RUBY" value="false" />
+      <option name="SHELL_SCRIPT" value="false" />
+      <option name="SQL" value="false" />
+      <option name="Slim" value="false" />
+      <option name="TypeScript" value="false" />
+      <option name="Vue" value="false" />
+      <option name="XML" value="false" />
+    </context>
+  </template>
+  <template name="assert" value="macro assert(exp)&#10;  raise {{exp.stringify}} unless {{exp}}&#10;end" toReformat="false" toShortenFQNames="true">
+    <context>
+      <option name="CSS" value="false" />
+      <option name="CUCUMBER_FEATURE_FILE" value="false" />
+      <option name="CoffeeScript" value="false" />
+      <option name="ECMAScript6" value="false" />
+      <option name="HAML" value="false" />
+      <option name="HTML" value="false" />
+      <option name="HTTP_CLIENT_ENVIRONMENT" value="false" />
+      <option name="JAVA_SCRIPT" value="false" />
+      <option name="JSON" value="false" />
+      <option name="LIQUID" value="false" />
+      <option name="OTHER" value="true" />
+      <option name="RBS_CODE" value="false" />
+      <option name="REQUEST" value="false" />
+      <option name="RHTML" value="false" />
+      <option name="RUBY" value="false" />
+      <option name="SHELL_SCRIPT" value="false" />
+      <option name="SQL" value="false" />
+      <option name="Slim" value="false" />
+      <option name="TypeScript" value="false" />
+      <option name="Vue" value="false" />
+      <option name="XML" value="false" />
+    </context>
+  </template>
+</templateSet>
