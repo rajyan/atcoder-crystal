@@ -1,5 +1,5 @@
 <templateSet group="Crystal">
-  <template name="dump" value="macro dump(*vs)&#10;  o={% for v in vs %}{{v.stringify}} + &quot;=#{{{v}}}\n&quot;{% end %}&#10;  STDERR.puts o&#10;end" description="" toReformat="true" toShortenFQNames="true">
+  <template name="dump" value="macro dump(*vs)&#10;  {% for v in vs %}&#10;    STDERR.puts {{v.stringify}} + &quot;=#{{{v}}}&quot;&#10;  {% end %}&#10;end" description="" toReformat="true" toShortenFQNames="true">
     <context>
       <option name="CSS" value="false" />
       <option name="CUCUMBER_FEATURE_FILE" value="false" />
