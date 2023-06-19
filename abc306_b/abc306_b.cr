@@ -1,0 +1,1 @@
+puts read_line.split.join.reverse.to_u64(2)
