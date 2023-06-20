@@ -6,32 +6,23 @@ end
 
 s = read_line
 t = read_line
+A = "atcoder@"
 
-cnt = Array.new(27, 0)
-t.each_char do |c|
-  if c == '@'
-    cnt[-1] += 1
-  else
-    cnt[c - 'a'] += 1
-  end
-end
+cnt = Array.new(128, 0)
+t.each_char { |c| cnt[c - '@'] += 1 }
 dump cnt
 
 s.each_char do |c|
   next if c == '@'
-  if cnt[c - 'a'] != 0
-    cnt[c - 'a'] -= 1
-  elsif cnt[-1] != 0 && "atcoder".includes?(c)
-    cnt[-1] -= 1
-  else
-    puts "No"
-    exit
-  end
+  next cnt[c - '@'] -= 1 if cnt[c - '@'] != 0
+  next cnt[0] -= 1 if cnt[0] != 0 && A.includes?(c)
+  puts "No"
+  exit
 end
 
 cnt.each_with_index do |c, i|
   next if c == 0
-  next if "atcoder{".includes?('a' + i)
+  next if A.includes?('@' + i)
   puts "No"
   exit
 end
