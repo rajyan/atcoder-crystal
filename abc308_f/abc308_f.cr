@@ -3,13 +3,24 @@ p = read_line.split.map(&.to_i).sort
 l = read_line.split.map(&.to_i)
 d = read_line.split.map(&.to_i)
 
+macro dump(*vs)
+  {% unless flag?(:release) %}
+    {% for v in vs %}
+      STDERR.puts {{v.stringify}} + "=#{{{v}}}"
+    {% end %}
+  {% end %}
+end
+
 tree = RBST(Int32).new
+p.each { |p| tree << p }
+p.each { |p| dump tree.search(p).not_nil!.val }
+p.each { |p| dump tree.delete(p) }
 p.each { |p| tree << p }
 
 ans = p.map(&.to_i64).sum
 ld = l.zip(d).sort_by { |(l, d)| -d }
 ld.each do |(l, d)|
-  min = tree.higher_than(l)
+  min = tree >= l
   next unless min
   tree.delete(min)
   ans -= d
@@ -47,38 +58,43 @@ class RBST(T)
       self
     end
 
-    def to_s(io : IO)
-      a = Array.new(height * 10) { Array.new(size * 5) { " " } }
-      a[0][0] = val.to_s
-      dump val.to_s
-      l = 0
-
-      dfs = uninitialized Node(T) -> String | Nil
-      dfs = ->(now : Node(T)) {
-        if now.left
-          dump now.height * 2
-          a[(10-now.height) * 2 - 1][l] = "|"
-          a[(10-now.height) * 2][l] = now.val.to_s
-          dfs.call(now.left.not_nil!)
-        end
-        if now.right
-          l += 1
-          dump now.height * 2
-          a[(10-now.height) * 2 - 1][l] = "\\"
-          a[(10-now.height) * 2][l] = now.val.to_s
-          dfs.call(now.right.not_nil!)
-        end
-      }
-      dfs.call(self)
-      dump a.map(&.join)
-    end
+    # def to_s(io : IO)
+    #   a = Array.new(height * 10) { Array.new(size * 5) { " " } }
+    #   a[0][0] = val.to_s
+    #   dump val.to_s
+    #   l = 0
+    #
+    #   dfs = uninitialized Node(T) -> String | Nil
+    #   dfs = ->(now : Node(T)) {
+    #     if now.left
+    #       dump now.height * 2
+    #       a[(10 - now.height) * 2 - 1][l] = "|"
+    #       a[(10 - now.height) * 2][l] = now.val.to_s
+    #       dfs.call(now.left.not_nil!)
+    #     end
+    #     if now.right
+    #       l += 1
+    #       dump now.height * 2
+    #       a[(10 - now.height) * 2 - 1][l] = "\\"
+    #       a[(10 - now.height) * 2][l] = now.val.to_s
+    #       dfs.call(now.right.not_nil!)
+    #     end
+    #   }
+    #   dfs.call(self)
+    #   dump a.map(&.join)
+    # end
   end
 
   @root : Node(T) | Nil = nil
+  @comp : (T, T) -> Bool = ->(a : T, b : T) { a > b }
+
+  def initialize(a : Array(T) = [] of T)
+    a.each { |e| insert(e) }
+  end
 
   def initialize(a : Array(T) = [] of T, &block)
-    a.each{ |e| insert(e) }
-
+    a.each { |e| insert(e) }
+    @comp = block
   end
 
   def insert(v : T)
@@ -95,8 +111,14 @@ class RBST(T)
 
   def search(v : T) : Node(T) | Nil
     node = @root
-    until node.nil? || v == node.val
-      node = v < node.val ? node.left : node.right
+    until node.nil?
+      node = if @comp.call(node.val, v)
+               node.left
+             elsif @comp.call(v, node.val)
+               node.right
+             else
+               return node
+             end
     end
     node
   end
@@ -123,29 +145,29 @@ class RBST(T)
     nth(n)
   end
 
-  def lower_than(v : T) : T | Nil
+  def <=(v : T) : T | Nil
     node = @root
     ret = nil
     until node.nil?
-      node = if node.val <= v
+      node = if @comp.call(node.val, v)
+               node.left
+             else
                ret = node.val
                node.right
-             else
-               node.left
              end
     end
     ret
   end
 
-  def higher_than(v : T) : T | Nil
+  def >=(v : T) : T | Nil
     node = @root
     ret = nil
     until node.nil?
-      node = if node.val >= v
+      node = if @comp.call(v, node.val)
+               node.right
+             else
                ret = node.val
                node.left
-             else
-               node.right
              end
     end
     ret
@@ -167,7 +189,7 @@ class RBST(T)
     return Node(T).new(v) unless node
     return insert_root(node, v) if rand(node.size + 1) == 0
 
-    if v < node.val
+    if @comp.call(node.val, v)
       node.left = insert_node(node.left, v)
     else
       node.right = insert_node(node.right, v)
@@ -178,7 +200,7 @@ class RBST(T)
   private def insert_root(node : Node(T) | Nil, v : T) : Node(T)
     return Node(T).new(v) unless node
 
-    if v < node.val
+    if @comp.call(node.val, v)
       node.left = insert_root(node.left, v)
       rotate_right(node)
     else
@@ -189,12 +211,13 @@ class RBST(T)
 
   private def delete_node(node : Node(T) | Nil, v : T) : Node(T) | Nil
     return nil unless node
-    return meld(node.left, node.right) if v == node.val
 
-    if v < node.val
+    if @comp.call(node.val, v)
       node.left = delete_node(node.left, v)
-    else
+    elsif @comp.call(v, node.val)
       node.right = delete_node(node.right, v)
+    else
+      return meld(node.left, node.right)
     end
     node.fix
   end
