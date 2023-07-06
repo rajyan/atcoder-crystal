@@ -15,26 +15,6 @@ end
 
 puts ans
 
-class Node(T) < Reference
-  @left : Node(T) | Nil
-  @right : Node(T) | Nil
-  property :left, :right
-  getter :val, :size, :height
-
-  def initialize(@val : T)
-    @left = nil
-    @right = nil
-    @size = 1
-    @height = 1
-  end
-
-  def fix
-    @size = (@left.try(&.size) || 0) + (@right.try(&.size) || 0) + 1
-    @height = {@left.try(&.height) || 0, @right.try(&.height) || 0}.max + 1
-    self
-  end
-end
-
 class RBST(T)
   @root : Node(T) | Nil = nil
   getter :root
@@ -195,5 +175,25 @@ class RBST(T)
     top.left, node.right = node, top.left
     node.fix
     top.fix
+  end
+end
+
+class Node(T) < Reference
+  @left : Node(T) | Nil
+  @right : Node(T) | Nil
+  property :left, :right
+  getter :val, :size, :height
+
+  def initialize(@val : T)
+    @left = nil
+    @right = nil
+    @size = 1
+    @height = 1
+  end
+
+  def fix
+    @size = (@left.try(&.size) || 0) + (@right.try(&.size) || 0) + 1
+    @height = {@left.try(&.height) || 0, @right.try(&.height) || 0}.max + 1
+    self
   end
 end
