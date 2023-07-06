@@ -1,3 +1,20 @@
+n, m = read_line.split.map(&.to_i)
+p = read_line.split.map(&.to_i).sort
+l = read_line.split.map(&.to_i)
+d = read_line.split.map(&.to_i)
+
+tree = RBST(Int32).new
+p.each { |p| tree << p }
+
+ans = p.map(&.to_i64).sum
+ld = l.zip(d).sort_by { |(l, d)| -d }
+ld.each do |(l, d)|
+  min = tree.higher_than(l)
+  next unless min
+  tree.delete(min)
+  ans -= d
+end
+
 macro dump(*vs)
   {% unless flag?(:release) %}
     {% for v in vs %}
@@ -6,249 +23,206 @@ macro dump(*vs)
   {% end %}
 end
 
-n, m = read_line.split.map(&.to_i)
-p = read_line.split.map(&.to_i64).sort
-l = read_line.split.map(&.to_i64)
-d = read_line.split.map(&.to_i64)
-
-tree = AtCoder::SegTree.new(n.times.to_a) { |a, b| [a, b].min }
-ld = Array.new(m) { |i| {l[i], d[i]} }.sort_by { |(l, d)| -d }
-ans = p.sum
-ld.each do |(l, d)|
-  index = p.bsearch_index { |p_| p_ >= l }
-  next unless index
-  i = tree[index...n]
-  next if i > n
-  tree.set(i, Int32::MAX)
-  dump tree.values
-  ans -= d
-end
+dump tree.to_s
 
 puts ans
 
-# ac-library.cr by hakatashi https://github.com/google/ac-library.cr
-#
-# Copyright 2023 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+class RBST(T)
+  class Node(T) < Reference
+    @left : Node(T) | Nil
+    @right : Node(T) | Nil
+    property :left, :right
+    getter :val, :size, :height
 
-module AtCoder
-  # Implements [atcoder::segtree](https://atcoder.github.io/ac-library/master/document_en/segtree.html).
-  #
-  # The identity element will be implicitly defined as nil, so you don't
-  # have to manually define it. In the other words, you cannot include
-  # nil into an element of the monoid.
-  #
-  # ```
-  # tree = AtCoder::SegTree.new((0...100).to_a) { |a, b| [a, b].min }
-  # tree[10...50] # => 10
-  # ```
-  class SegTree(T)
-    getter values : Array(T)
-
-    @height : Int32
-    @n_leaves : Int32
-
-    def initialize(values : Array(T))
-      initialize(values) { |a, b| a > b ? a : b }
+    def initialize(@val : T)
+      @left = nil
+      @right = nil
+      @size = 1
+      @height = 1
     end
 
-    def initialize(@values : Array(T), &@operator : T, T -> T)
-      @height = log2_ceil(@values.size)
-      @n_leaves = 1 << @height
-
-      @segments = Array(T | Nil).new(2 * @n_leaves, nil)
-
-      # initialize segments
-      values.each_with_index { |x, i| @segments[@n_leaves + i] = x.as(T | Nil) }
-      (@n_leaves - 1).downto(1) { |i| refresh(i) }
+    def fix
+      @size = (@left.try(&.size) || 0) + (@right.try(&.size) || 0) + 1
+      @height = {@left.try(&.height) || 0, @right.try(&.height) || 0}.max + 1
+      self
     end
 
-    @[AlwaysInline]
-    private def operate(a : T | Nil, b : T | Nil)
-      if a.nil?
-        b
-      elsif b.nil?
-        a
-      else
-        @operator.call(a, b)
-      end
-    end
+    def to_s(io : IO)
+      a = Array.new(height * 10) { Array.new(size * 5) { " " } }
+      a[0][0] = val.to_s
+      dump val.to_s
+      l = 0
 
-    # Implements atcoder::segtree.set(index, value)
-    def []=(index : Int, value : T)
-      @values[index] = value
-
-      index += @n_leaves
-      @segments[index] = value.as(T | Nil)
-      (1..@height).each { |j| refresh(ancestor(index, j)) }
-    end
-
-    # Implements atcoder::segtree.get(index)
-    def [](index : Int)
-      @values[index]
-    end
-
-    # Implements atcoder::segtree.prod(l, r)
-    def [](range : Range(Int, Int))
-      l = range.begin + @n_leaves
-      r = (range.exclusive? ? range.end : range.end + 1) + @n_leaves
-
-      sml, smr = nil.as(T | Nil), nil.as(T | Nil)
-      while l < r
-        if l.odd?
-          sml = operate(sml, @segments[l])
+      dfs = uninitialized Node(T) -> String | Nil
+      dfs = ->(now : Node(T)) {
+        if now.left
+          dump now.height * 2
+          a[(10-now.height) * 2 - 1][l] = "|"
+          a[(10-now.height) * 2][l] = now.val.to_s
+          dfs.call(now.left.not_nil!)
+        end
+        if now.right
           l += 1
+          dump now.height * 2
+          a[(10-now.height) * 2 - 1][l] = "\\"
+          a[(10-now.height) * 2][l] = now.val.to_s
+          dfs.call(now.right.not_nil!)
         end
-        if r.odd?
-          r -= 1
-          smr = operate(@segments[r], smr)
-        end
-        l >>= 1
-        r >>= 1
-      end
-
-      operate(sml, smr).not_nil!
+      }
+      dfs.call(self)
+      dump a.map(&.join)
     end
+  end
 
-    # compatibility with ac-library
+  @root : Node(T) | Nil = nil
 
-    # Implements atcoder::segtree.set(index, value)
-    # alias of `.[]=`
-    def set(index : Int, value : T)
-      self.[]=(index, value)
+  def initialize(a : Array(T) = [] of T, &block)
+    a.each{ |e| insert(e) }
+
+  end
+
+  def insert(v : T)
+    @root = insert_node(@root, v)
+  end
+
+  def <<(v : T)
+    insert(v)
+  end
+
+  def delete(v : T) : Node(T) | Nil
+    @root = delete_node(@root, v)
+  end
+
+  def search(v : T) : Node(T) | Nil
+    node = @root
+    until node.nil? || v == node.val
+      node = v < node.val ? node.left : node.right
     end
+    node
+  end
 
-    # Implements atcoder::segtree.get(index)
-    # alias of `.[]`
-    def get(index : Int)
-      self.[](index)
+  def clear
+    @root = nil
+  end
+
+  def nth(n : Int32) : Node(T) | Nil
+    node = @root
+    until node.nil?
+      idx = node.left.try(&.size) || 0
+      return node if idx == n
+      node = if idx > n
+               node.left
+             else
+               n -= idx + 1
+               node.right
+             end
     end
+  end
 
-    # Implements atcoder::segtree.prod(left, right)
-    def prod(left : Int, right : Int)
-      self.[](left...right)
+  def [](n : Int32)
+    nth(n)
+  end
+
+  def lower_than(v : T) : T | Nil
+    node = @root
+    ret = nil
+    until node.nil?
+      node = if node.val <= v
+               ret = node.val
+               node.right
+             else
+               node.left
+             end
     end
+    ret
+  end
 
-    # Implements atcoder::segtree.all_prod(l, r)
-    def all_prod
-      @segments[1].not_nil!
+  def higher_than(v : T) : T | Nil
+    node = @root
+    ret = nil
+    until node.nil?
+      node = if node.val >= v
+               ret = node.val
+               node.left
+             else
+               node.right
+             end
     end
+    ret
+  end
 
-    # Implements atcoder::lazy_segtree.max_right(left, g).
-    def max_right(left, e : T | Nil = nil, & : T -> Bool)
-      unless 0 <= left && left <= @values.size
-        raise IndexError.new("{left: #{left}} must greater than or equal to 0 and less than or equal to {n: #{@values.size}}")
-      end
+  def size
+    @root.try(&.size) || 0
+  end
 
-      unless e.nil?
-        return nil unless yield e
-      end
+  def height
+    @root.try(&.height) || 0
+  end
 
-      return @values.size if left == @values.size
+  def to_s(io : IO)
+    @root.try(&.to_s) || ""
+  end
 
-      left += @n_leaves
-      sm = e
-      loop do
-        while left.even?
-          left >>= 1
-        end
+  private def insert_node(node : Node(T) | Nil, v : T) : Node(T)
+    return Node(T).new(v) unless node
+    return insert_root(node, v) if rand(node.size + 1) == 0
 
-        res = operate(sm, @segments[left])
-        unless res.nil? || yield res
-          while left < @n_leaves
-            left = 2*left
-            res = operate(sm, @segments[left])
-            if res.nil? || yield res
-              sm = res
-              left += 1
-            end
-          end
-          return left - @n_leaves
-        end
-
-        sm = operate(sm, @segments[left])
-        left += 1
-
-        ffs = left & -left
-        break if ffs == left
-      end
-
-      @values.size
+    if v < node.val
+      node.left = insert_node(node.left, v)
+    else
+      node.right = insert_node(node.right, v)
     end
+    node.fix
+  end
 
-    # Implements atcoder::lazy_segtree.min_left(right, g).
-    def min_left(right, e : T | Nil = nil, & : T -> Bool)
-      unless 0 <= right && right <= @values.size
-        raise IndexError.new("{right: #{right}} must greater than or equal to 0 and less than or equal to {n: #{@values.size}}")
-      end
+  private def insert_root(node : Node(T) | Nil, v : T) : Node(T)
+    return Node(T).new(v) unless node
 
-      unless e.nil?
-        return nil unless yield e
-      end
-
-      return 0 if right == 0
-
-      right += @n_leaves
-      sm = e
-      loop do
-        right -= 1
-        while right > 1 && right.odd?
-          right >>= 1
-        end
-
-        res = operate(@segments[right], sm)
-        unless res.nil? || yield res
-          while right < @n_leaves
-            right = 2*right + 1
-            res = operate(@segments[right], sm)
-            if res.nil? || yield res
-              sm = res
-              right -= 1
-            end
-          end
-          return right + 1 - @n_leaves
-        end
-
-        sm = operate(@segments[right], sm)
-
-        ffs = right & -right
-        break if ffs == right
-      end
-
-      0
+    if v < node.val
+      node.left = insert_root(node.left, v)
+      rotate_right(node)
+    else
+      node.right = insert_root(node.right, v)
+      rotate_left(node)
     end
+  end
 
-    @[AlwaysInline]
-    private def refresh(node : Int)
-      child1 = 2*node
-      child2 = 2*node + 1
-      @segments[node] = operate(@segments[child1], @segments[child2])
-    end
+  private def delete_node(node : Node(T) | Nil, v : T) : Node(T) | Nil
+    return nil unless node
+    return meld(node.left, node.right) if v == node.val
 
-    @[AlwaysInline]
-    private def ancestor(node, n_gens_ago)
-      node >> n_gens_ago
+    if v < node.val
+      node.left = delete_node(node.left, v)
+    else
+      node.right = delete_node(node.right, v)
     end
+    node.fix
+  end
 
-    @[AlwaysInline]
-    private def log2_ceil(n : Int32) : Int32
-      sizeof(Int32)*8 - (n - 1).leading_zeros_count
-    end
+  private def meld(left : Node(T) | Nil, right : Node(T) | Nil) : Node(T) | Nil
+    return right unless left
+    return left unless right
 
-    @[AlwaysInline]
-    private def log2_ceil(n : Int32) : Int32
-      sizeof(Int32)*8 - (n - 1).leading_zeros_count
+    if rand(left.size + right.size) < left.size
+      left.right = meld(left.right, right)
+      left.fix
+    else
+      right.left = meld(left, right.left)
+      right.fix
     end
+  end
+
+  private def rotate_right(node : Node(T)) : Node(T)
+    top = node.left.not_nil!
+    top.right, node.left = node, top.right
+    node.fix
+    top.fix
+  end
+
+  private def rotate_left(node : Node(T)) : Node(T)
+    top = node.right.not_nil!
+    top.left, node.right = node, top.left
+    node.fix
+    top.fix
   end
 end
