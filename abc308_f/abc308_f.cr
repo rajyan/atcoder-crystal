@@ -3,20 +3,7 @@ p = read_line.split.map(&.to_i).sort
 l = read_line.split.map(&.to_i)
 d = read_line.split.map(&.to_i)
 
-macro dump(*vs)
-  {% unless flag?(:release) %}
-    {% for v in vs %}
-      STDERR.puts {{v.stringify}} + "=#{{{v}}}"
-    {% end %}
-  {% end %}
-end
-
-tree = RBST(Int32).new
-p.each { |p| tree << p }
-p.each { |p| dump tree.search(p).not_nil!.val }
-p.each { |p| dump tree.delete(p) }
-p.each { |p| tree << p }
-
+tree = RBST(Int32).new(p)
 ans = p.map(&.to_i64).sum
 ld = l.zip(d).sort_by { |(l, d)| -d }
 ld.each do |(l, d)|
@@ -26,66 +13,31 @@ ld.each do |(l, d)|
   ans -= d
 end
 
-macro dump(*vs)
-  {% unless flag?(:release) %}
-    {% for v in vs %}
-      STDERR.puts {{v.stringify}} + "=#{{{v}}}"
-    {% end %}
-  {% end %}
-end
-
-dump tree.to_s
-
 puts ans
 
-class RBST(T)
-  class Node(T) < Reference
-    @left : Node(T) | Nil
-    @right : Node(T) | Nil
-    property :left, :right
-    getter :val, :size, :height
+class Node(T) < Reference
+  @left : Node(T) | Nil
+  @right : Node(T) | Nil
+  property :left, :right
+  getter :val, :size, :height
 
-    def initialize(@val : T)
-      @left = nil
-      @right = nil
-      @size = 1
-      @height = 1
-    end
-
-    def fix
-      @size = (@left.try(&.size) || 0) + (@right.try(&.size) || 0) + 1
-      @height = {@left.try(&.height) || 0, @right.try(&.height) || 0}.max + 1
-      self
-    end
-
-    # def to_s(io : IO)
-    #   a = Array.new(height * 10) { Array.new(size * 5) { " " } }
-    #   a[0][0] = val.to_s
-    #   dump val.to_s
-    #   l = 0
-    #
-    #   dfs = uninitialized Node(T) -> String | Nil
-    #   dfs = ->(now : Node(T)) {
-    #     if now.left
-    #       dump now.height * 2
-    #       a[(10 - now.height) * 2 - 1][l] = "|"
-    #       a[(10 - now.height) * 2][l] = now.val.to_s
-    #       dfs.call(now.left.not_nil!)
-    #     end
-    #     if now.right
-    #       l += 1
-    #       dump now.height * 2
-    #       a[(10 - now.height) * 2 - 1][l] = "\\"
-    #       a[(10 - now.height) * 2][l] = now.val.to_s
-    #       dfs.call(now.right.not_nil!)
-    #     end
-    #   }
-    #   dfs.call(self)
-    #   dump a.map(&.join)
-    # end
+  def initialize(@val : T)
+    @left = nil
+    @right = nil
+    @size = 1
+    @height = 1
   end
 
+  def fix
+    @size = (@left.try(&.size) || 0) + (@right.try(&.size) || 0) + 1
+    @height = {@left.try(&.height) || 0, @right.try(&.height) || 0}.max + 1
+    self
+  end
+end
+
+class RBST(T)
   @root : Node(T) | Nil = nil
+  getter :root
   @comp : (T, T) -> Bool = ->(a : T, b : T) { a > b }
 
   def initialize(a : Array(T) = [] of T)
@@ -179,10 +131,6 @@ class RBST(T)
 
   def height
     @root.try(&.height) || 0
-  end
-
-  def to_s(io : IO)
-    @root.try(&.to_s) || ""
   end
 
   private def insert_node(node : Node(T) | Nil, v : T) : Node(T)
