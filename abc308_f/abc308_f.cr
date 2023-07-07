@@ -41,6 +41,10 @@ class RBST(T)
     @root = delete_node(@root, v)
   end
 
+  def clear
+    @root = nil
+  end
+
   def search(v : T) : Node(T) | Nil
     node = @root
     until node.nil?
@@ -53,28 +57,6 @@ class RBST(T)
              end
     end
     node
-  end
-
-  def clear
-    @root = nil
-  end
-
-  def nth(n : Int32) : Node(T) | Nil
-    node = @root
-    until node.nil?
-      idx = node.left.try(&.size) || 0
-      return node if idx == n
-      node = if idx > n
-               node.left
-             else
-               n -= idx + 1
-               node.right
-             end
-    end
-  end
-
-  def [](n : Int32)
-    nth(n)
   end
 
   def <=(v : T) : T | Nil
@@ -105,6 +87,38 @@ class RBST(T)
     ret
   end
 
+  def rank(v : T) : Int32
+    node = @root
+    idx = 0
+    until node.nil?
+      node = if v <= node.val
+               node = node.left
+             else
+               idx += (node.left.try(&.size) || 0) + 1
+               node = node.right
+             end
+    end
+    idx
+  end
+
+  def nth(n : Int32) : Node(T) | Nil
+    node = @root
+    until node.nil?
+      idx = node.left.try(&.size) || 0
+        return node if idx == n
+      node = if idx > n
+        node.left
+      else
+        n -= idx + 1
+        node.right
+      end
+    end
+  end
+
+  def [](n : Int32)
+    nth(n)
+  end
+
   def size
     @root.try(&.size) || 0
   end
@@ -115,26 +129,9 @@ class RBST(T)
 
   private def insert_node(node : Node(T) | Nil, v : T) : Node(T)
     return Node(T).new(v) unless node
-    return insert_root(node, v) if rand(node.size + 1) == 0
 
-    if @comp.call(node.val, v)
-      node.left = insert_node(node.left, v)
-    else
-      node.right = insert_node(node.right, v)
-    end
-    node.fix
-  end
-
-  private def insert_root(node : Node(T) | Nil, v : T) : Node(T)
-    return Node(T).new(v) unless node
-
-    if @comp.call(node.val, v)
-      node.left = insert_root(node.left, v)
-      rotate_right(node)
-    else
-      node.right = insert_root(node.right, v)
-      rotate_left(node)
-    end
+    left, right = split(node, rank(v))
+    merge(merge(left, Node(T).new(v)), right).not_nil!
   end
 
   private def delete_node(node : Node(T) | Nil, v : T) : Node(T) | Nil
@@ -145,20 +142,35 @@ class RBST(T)
     elsif @comp.call(v, node.val)
       node.right = delete_node(node.right, v)
     else
-      return meld(node.left, node.right)
+      return merge(node.left, node.right)
     end
     node.fix
   end
 
-  private def meld(left : Node(T) | Nil, right : Node(T) | Nil) : Node(T) | Nil
+  private def split(node : Node(T) | Nil, k : Int32) : {Node(T) | Nil, Node(T) | Nil}
+    return {nil, nil} unless node
+
+    sz = node.left.try(&.size) || 0
+    if k <= sz
+      left, right = split(node.left, k)
+      node.left, right = right, node
+      {left, right.fix}
+    else
+      left, right = split(node.right, k - sz - 1)
+      node.right, left = left, node
+      {left.fix, right}
+    end
+  end
+
+  private def merge(left : Node(T) | Nil, right : Node(T) | Nil) : Node(T) | Nil
     return right unless left
     return left unless right
 
     if rand(left.size + right.size) < left.size
-      left.right = meld(left.right, right)
+      left.right = merge(left.right, right)
       left.fix
     else
-      right.left = meld(left, right.left)
+      right.left = merge(left, right.left)
       right.fix
     end
   end
