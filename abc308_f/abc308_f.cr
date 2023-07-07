@@ -29,96 +29,6 @@ class RBST(T)
     @comp = block
   end
 
-  def insert(v : T)
-    @root = insert_node(@root, v)
-  end
-
-  def <<(v : T)
-    insert(v)
-  end
-
-  def delete(v : T) : Node(T) | Nil
-    @root = delete_node(@root, v)
-  end
-
-  def clear
-    @root = nil
-  end
-
-  def search(v : T) : Node(T) | Nil
-    node = @root
-    until node.nil?
-      node = if @comp.call(node.val, v)
-               node.left
-             elsif @comp.call(v, node.val)
-               node.right
-             else
-               return node
-             end
-    end
-    node
-  end
-
-  def <=(v : T) : T | Nil
-    node = @root
-    ret = nil
-    until node.nil?
-      node = if @comp.call(node.val, v)
-               node.left
-             else
-               ret = node.val
-               node.right
-             end
-    end
-    ret
-  end
-
-  def >=(v : T) : T | Nil
-    node = @root
-    ret = nil
-    until node.nil?
-      node = if @comp.call(v, node.val)
-               node.right
-             else
-               ret = node.val
-               node.left
-             end
-    end
-    ret
-  end
-
-  def rank(v : T) : Int32
-    node = @root
-    idx = 0
-    until node.nil?
-      node = if v <= node.val
-               node = node.left
-             else
-               idx += (node.left.try(&.size) || 0) + 1
-               node = node.right
-             end
-    end
-    idx
-  end
-
-  def nth(n : Int32) : Node(T) | Nil
-    node = @root
-    until node.nil?
-      idx = node.left.try(&.size) || 0
-        return node if idx == n
-      node = if idx > n
-        node.left
-      else
-        n -= idx + 1
-        node.right
-      end
-    end
-  end
-
-  def [](n : Int32)
-    nth(n)
-  end
-
   def size
     @root.try(&.size) || 0
   end
@@ -127,27 +37,119 @@ class RBST(T)
     @root.try(&.height) || 0
   end
 
-  private def insert_node(node : Node(T) | Nil, v : T) : Node(T)
+  def insert(v : T)
+    @root = insert(v, @root)
+  end
+
+  def insert(v : T, node : Node(T) | Nil) : Node(T)
     return Node(T).new(v) unless node
 
-    left, right = split(node, rank(v))
+    left, right = split(node, index(v))
     merge(merge(left, Node(T).new(v)), right).not_nil!
   end
 
-  private def delete_node(node : Node(T) | Nil, v : T) : Node(T) | Nil
+  def <<(v : T)
+    insert(v)
+  end
+
+  def delete(v : T)
+    @root = delete(v, @root)
+  end
+
+  def delete(v : T, node : Node(T) | Nil) : Node(T) | Nil
     return nil unless node
 
-    if @comp.call(node.val, v)
-      node.left = delete_node(node.left, v)
-    elsif @comp.call(v, node.val)
-      node.right = delete_node(node.right, v)
+    if @comp.call(node.key, v)
+      node.left = delete(v, node.left)
+    elsif @comp.call(v, node.key)
+      node.right = delete(v, node.right)
     else
       return merge(node.left, node.right)
     end
     node.fix
   end
 
-  private def split(node : Node(T) | Nil, k : Int32) : {Node(T) | Nil, Node(T) | Nil}
+  def clear
+    @root = nil
+  end
+
+  def search(v : T, node : Node(T) = @root) : Node(T) | Nil
+    until node.nil?
+      node = if @comp.call(node.key, v)
+               node.left
+             elsif @comp.call(v, node.key)
+               node.right
+             else
+               return node
+             end
+    end
+  end
+
+  def lower_than(v : T, node : Node(T) = @root) : T | Nil
+    ret = nil
+    until node.nil?
+      node = if @comp.call(node.key, v)
+               node.left
+             else
+               ret = node.key
+               node.right
+             end
+    end
+    ret
+  end
+
+  def <=(v : T)
+    lower_than(v)
+  end
+
+  def higher_than(v : T, node : Node(T) = @root) : T | Nil
+    ret = nil
+    until node.nil?
+      node = if @comp.call(v, node.key)
+               node.right
+             else
+               ret = node.key
+               node.left
+             end
+    end
+    ret
+  end
+
+  def >=(v : T)
+    higher_than(v)
+  end
+
+  def index(v : T, node : Node(T) = @root) : Int32
+    idx = 0
+    until node.nil?
+      node = if v <= node.key
+               node.left
+             else
+               idx += (node.left.try(&.size) || 0) + 1
+               node.right
+             end
+    end
+    idx
+  end
+
+  def nth(n : Int32, node : Node(T) = @root) : Node(T) | Nil
+    until node.nil?
+      idx = node.left.try(&.size) || 0
+      return node if idx == n
+      node = if idx > n
+               node.left
+             else
+               n -= idx + 1
+               node.right
+             end
+    end
+  end
+
+  def [](n : Int32)
+    nth(n)
+  end
+
+  def split(node : Node(T) | Nil, k : Int32) : {Node(T) | Nil, Node(T) | Nil}
     return {nil, nil} unless node
 
     sz = node.left.try(&.size) || 0
@@ -162,7 +164,7 @@ class RBST(T)
     end
   end
 
-  private def merge(left : Node(T) | Nil, right : Node(T) | Nil) : Node(T) | Nil
+  def merge(left : Node(T) | Nil, right : Node(T) | Nil) : Node(T) | Nil
     return right unless left
     return left unless right
 
@@ -194,9 +196,9 @@ class Node(T) < Reference
   @left : Node(T) | Nil
   @right : Node(T) | Nil
   property :left, :right
-  getter :val, :size, :height
+  getter :key, :size, :height
 
-  def initialize(@val : T)
+  def initialize(@key : T)
     @left = nil
     @right = nil
     @size = 1
