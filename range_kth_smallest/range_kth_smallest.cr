@@ -1,25 +1,22 @@
 n, q = read_line.split.map(&.to_i)
 a = read_line.split.map(&.to_i)
 
-rbst = RBST(Int32).new(a)
-
 def tree_dump(top)
   return STDERR.puts "empty" unless top
-  top = top.dup
-  a = Array.new(top.height * 2) { Array.new(top.size * 2) { " " } }
-  a[0][0] = top.key.to_s + "(#{top.not_nil!.size})"
+  a = Array.new(top.height * 2) { Array.new(top.size * 5) { " " } }
+  a[0][0] = "#{top.key.to_s}(#{top.size})"
   cnt = 0
   dfs = uninitialized typeof(top) -> String | Nil
   dfs = ->(now : typeof(top)) {
     if nl = now.left
       a[(top.height - nl.height) * 2 - 1][cnt] = "|"
-      a[(top.height - nl.height) * 2][cnt] = nl.key.to_s + "(#{nl.not_nil!.size})"
+      a[(top.height - nl.height) * 2][cnt] = "#{nl.key.to_s}(#{nl.size})"
       dfs.call(nl)
     end
     if nr = now.right
-      cnt += 2
+      cnt += 4
       a[(top.height - nr.height) * 2 - 1][cnt - 1] = "\\"
-      a[(top.height - nr.height) * 2][cnt] = nr.key.to_s + "(#{nl.not_nil!.size})"
+      a[(top.height - nr.height) * 2][cnt] = "#{nr.key.to_s}(#{nr.size})"
       dfs.call(nr)
     end
   }
@@ -27,11 +24,10 @@ def tree_dump(top)
   STDERR.puts a.map(&.join).join('\n')
 end
 
-tree_dump rbst.root
-
+rbst = RBST(Int32).new(a)
 q.times do
   l, r, k = read_line.split.map(&.to_i)
-  tree_dump rbst.split(rbst.root, r)[0]
+  tree_dump rbst[l...r]
 end
 
 class RBST(T)
@@ -63,7 +59,7 @@ class RBST(T)
   def insert(v : T, node : Node(T) | Nil) : Node(T)
     return Node(T).new(v) unless node
 
-    left, right = split(node, index(v))
+    left, right = split(node, rank(v))
     merge(merge(left, Node(T).new(v)), right).not_nil!
   end
 
@@ -138,7 +134,7 @@ class RBST(T)
     higher_than(v)
   end
 
-  def index(v : T, node : Node(T) = @root) : Int32
+  def rank(v : T, node : Node(T) = @root) : Int32
     idx = 0
     until node.nil?
       node = if v <= node.key
@@ -164,22 +160,33 @@ class RBST(T)
     end
   end
 
+  # [l...r]
+  def sub(l : Int32, r : Int32, node : Node(T) | Nil = @root)
+    split(split(node.dup, r)[0], l)[1]
+  end
+
   def [](n : Int32)
     nth(n)
   end
 
+  def [](range : Range)
+    sub(range.begin, range.end + (range.excludes_end? ? 0 : 1))
+  end
+
+  # {[0...k], [k...n]}
   def split(node : Node(T) | Nil, k : Int32) : {Node(T) | Nil, Node(T) | Nil}
+    raise IndexError.new unless 0 <= k <= (node.try &.size || 0)
     return {nil, nil} unless node
 
     sz = node.left.try(&.size) || 0
     if k <= sz
       left, right = split(node.left, k)
-      node.left, right = right, node
-      {left, right.fix}
+      node.left = right
+      {left, node.fix}
     else
       left, right = split(node.right, k - sz - 1)
-      node.right, left = left, node
-      {left.fix, right}
+      node.right = left
+      {node.fix, right}
     end
   end
 
