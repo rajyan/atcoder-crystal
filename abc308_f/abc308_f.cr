@@ -44,7 +44,7 @@ class RBST(T)
   def insert(v : T, node : Node(T) | Nil) : Node(T)
     return Node(T).new(v) unless node
 
-    left, right = split(node, index(v))
+    left, right = split(node, rank(v))
     merge(merge(left, Node(T).new(v)), right).not_nil!
   end
 
@@ -119,7 +119,7 @@ class RBST(T)
     higher_than(v)
   end
 
-  def index(v : T, node : Node(T) = @root) : Int32
+  def rank(v : T, node : Node(T) = @root) : Int32
     idx = 0
     until node.nil?
       node = if v <= node.key
@@ -145,22 +145,33 @@ class RBST(T)
     end
   end
 
+  # [l...r]
+  def range(l : Int32, r : Int32, node : Node(T) | Nil = @root)
+    split(split(node.dup, r)[0], l)[1]
+  end
+
   def [](n : Int32)
     nth(n)
   end
 
+  def [](r : Range)
+    range(r.begin, r.end + (r.excludes_end? ? 0 : 1))
+  end
+
+  # {[0...k], [k...n]}
   def split(node : Node(T) | Nil, k : Int32) : {Node(T) | Nil, Node(T) | Nil}
+    raise IndexError.new unless 0 <= k <= (node.try &.size || 0)
     return {nil, nil} unless node
 
     sz = node.left.try(&.size) || 0
     if k <= sz
-      left, right = split(node.left, k)
-      node.left, right = right, node
-      {left, right.fix}
+      left, right = split(node.left.dup, k)
+      node.left = right
+      {left, node.fix}
     else
-      left, right = split(node.right, k - sz - 1)
-      node.right, left = left, node
-      {left.fix, right}
+      left, right = split(node.right.dup, k - sz - 1)
+      node.right = left
+      {node.fix, right}
     end
   end
 
