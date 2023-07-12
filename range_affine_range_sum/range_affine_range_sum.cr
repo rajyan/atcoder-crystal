@@ -1,31 +1,31 @@
 n, q = read_line.split.map(&.to_i)
 a = read_line.split.map(&.to_i)
 
-rbst = RBST(Int32, {Mint, Mint}).new
-a.each_with_index { |a, i| rbst.insert(LazyNode(Int32, {Mint, Mint}, {Mint, Int32}).new(key: i, val: {Mint.new(a), 1})) }
+rbst = RBST(Int32, Monoid).new
+a.each_with_index { |a, i| rbst.insert(LazyNode(Int32, Monoid).new(key: i, m: Monoid.new(val: Mint.new(a)))) }
 
 q.times do |i|
   query = read_line.split.map(&.to_i)
   if query.shift == 1
     l, r = query
-    puts rbst[l...r].not_nil!.as(LazyNode).acc.not_nil!.[0]
+    puts rbst[l...r].not_nil!.m.not_nil!.acc
   else
     l, r, b, c = query
     rbst.apply(l, r, {Mint.new(b), Mint.new(c)})
   end
 end
 
-class RBST(T, F)
-  @root : Node(T)? = nil
+class RBST(KeyType, Monoid)
+  @root : Node(KeyType, Monoid)? = nil
   getter :root
-  @comp : (T, T) -> Bool = ->(a : T, b : T) { a > b }
-  @@rand = Random.new(4)
+  @comp : (KeyType, KeyType) -> Bool = ->(a : KeyType, b : KeyType) { a > b }
+  @@rand = Random.new
 
-  def initialize(a : Array(T) = [] of T, &@comp : (T, T) -> Bool)
+  def initialize(a : Array(KeyType) = [] of KeyType, &@comp : (KeyType, KeyType) -> Bool)
     a.each { |e| insert(e) }
   end
 
-  def initialize(a : Array(T) = [] of T, @comp = ->(a : T, b : T) { a > b })
+  def initialize(a : Array(KeyType) = [] of KeyType, @comp = ->(a : KeyType, b : KeyType) { a > b })
     a.each { |e| insert(e) }
   end
 
@@ -37,33 +37,33 @@ class RBST(T, F)
     @root.try(&.height) || 0
   end
 
-  def insert(v : T)
+  def insert(v : KeyType)
     @root = insert(v, @root)
   end
 
-  def insert(v : T, node : Node(T)?) : Node(T)
-    return Node(T).new(v) unless node
+  def insert(v : KeyType, node : Node(KeyType, Monoid)?) : Node(KeyType, Monoid)
+    return Node(KeyType, Monoid).new(v) unless node
 
     left, right = split(node, rank(v))
-    merge(merge(left, Node(T).new(v)), right).not_nil!
+    merge(merge(left, Node(KeyType, Monoid).new(v)), right).not_nil!
   end
 
-  def insert(n : Node(T)) : Node(T)
+  def insert(n : Node(KeyType, Monoid)) : Node(KeyType, Monoid)
     return @root = n unless @root
 
     left, right = split(@root, rank(n.key))
     @root = merge(merge(left, n), right).not_nil!
   end
 
-  def <<(v : T)
+  def <<(v : KeyType)
     insert(v)
   end
 
-  def delete(v : T)
+  def delete(v : KeyType)
     @root = delete(v, @root)
   end
 
-  def delete(v : T, node : Node(T)?) : Node(T)?
+  def delete(v : KeyType, node : Node(KeyType, Monoid)?) : Node(KeyType, Monoid)?
     return nil unless node
 
     left, mid = split(node, rank(v))
@@ -76,34 +76,44 @@ class RBST(T, F)
     @root = nil
   end
 
-  def search(v : T, node : Pointer(Node(T)?) = pointerof(@root)) : Node(T)?
+  def first(node : Node(KeyType, Monoid)?)
+    return nil unless node
+    first(node.left) || node
+  end
+
+  def last(node : Node(KeyType, Monoid)?)
+    return nil unless node
+    last(node.right) || node
+  end
+
+  def search(v : KeyType, node : Pointer(Node(KeyType, Monoid)?) = pointerof(@root)) : Node(KeyType, Monoid)?
     n = nth(rank(v), node)
     n.try(&.key) == v ? n : nil
   end
 
-  def lower_than(v : T, node : Pointer(Node(T)?) = pointerof(@root)) : Node(T)?
+  def lower_than(v : KeyType, node : Pointer(Node(KeyType, Monoid)?) = pointerof(@root)) : Node(KeyType, Monoid)?
     left, right = split(node.value, rank(v))
-    ret = left.try(&.last)
+    ret = last(left)
     node.value = merge(left, right) # restore
     ret
   end
 
-  def <(v : T)
+  def <(v : KeyType)
     lower_than(v)
   end
 
-  def higher_than(v : T, node : Pointer(Node(T)?) = pointerof(@root)) : Node(T)?
+  def higher_than(v : KeyType, node : Pointer(Node(KeyType, Monoid)?) = pointerof(@root)) : Node(KeyType, Monoid)?
     left, right = split(node.value, rank(v))
-    ret = right.try(&.first)
+    ret = first(right)
     node.value = merge(left, right) # restore
     ret
   end
 
-  def >=(v : T)
+  def >=(v : KeyType)
     higher_than(v)
   end
 
-  def rank(v : T, node : Node(T)? = @root)
+  def rank(v : KeyType, node : Node(KeyType, Monoid)? = @root)
     idx = 0
     until node.nil?
       node = if @comp.call(v, node.key)
@@ -116,12 +126,12 @@ class RBST(T, F)
     idx
   end
 
-  def nth(n : Int32, node : Pointer(Node(T)?) = pointerof(@root)) : Node(T)?
+  def nth(n : Int32, node : Pointer(Node(KeyType, Monoid)?) = pointerof(@root)) : Node(KeyType, Monoid)?
     range(n, n + 1, node)
   end
 
   # returned node's left, right property is not safe to use
-  def range(l : Int32, r : Int32, node : Pointer(Node(T)?) = pointerof(@root))
+  def range(l : Int32, r : Int32, node : Pointer(Node(KeyType, Monoid)?) = pointerof(@root))
     return nil unless node
 
     mid, right = split(node.value, r)
@@ -140,7 +150,7 @@ class RBST(T, F)
   end
 
   # {[0...k], [k...n]}
-  def split(node : Node(T)?, k : Int32) : {Node(T)?, Node(T)?}
+  def split(node : Node(KeyType, Monoid)?, k : Int32) : {Node(KeyType, Monoid)?, Node(KeyType, Monoid)?}
     return {nil, nil} unless node
     raise IndexError.new("k: #{k} is out of tree range") unless 0 <= k <= node.size
 
@@ -157,11 +167,10 @@ class RBST(T, F)
     end
   end
 
-  def merge(left : Node(T)?, right : Node(T)?) : Node(T)?
-    left.try &.propagate
-    right.try &.propagate
-
+  def merge(left : Node(KeyType, Monoid)?, right : Node(KeyType, Monoid)?) : Node(KeyType, Monoid)?
     return right || left if right.nil? || left.nil?
+    left.propagate
+    right.propagate
 
     if @@rand.rand(left.size + right.size) < left.size
       left.right = merge(left.right, right)
@@ -172,85 +181,81 @@ class RBST(T, F)
     end
   end
 
-  def apply(l : Int32, r : Int32, x : F, node : Pointer(Node(T)?) = pointerof(@root))
-    mid1, right = split(node.value, r)
-    left, mid2 = split(mid1, l)
-    mid2.try &.lz(x)
-    node.value = merge(merge(left, mid2), right) # restore
+  def apply(l : Int32, r : Int32, x : _, node : Pointer(Node(KeyType, Monoid)?) = pointerof(@root))
+    mid, right = split(node.value, r)
+    left, mid = split(mid, l)
+    mid.try &.apply(x)
+    node.value = merge(merge(left, mid), right) # restore
   end
 end
 
-class Node(T)
-  @left : Node(T)?
-  @right : Node(T)?
+class Node(KeyType, Monoid)
+  @left : Node(KeyType, Monoid)?
+  @right : Node(KeyType, Monoid)?
 
-  property :left, :right
+  property :left, :right, :m
   getter :key, :size, :height
 
-  def initialize(@key : T, @size : Int32 = 1, @height : Int32 = 1); end
+  def initialize(@key : KeyType, @m : Monoid? = nil, @size : Int32 = 1, @height : Int32 = 1); end
 
   def propagate; end
 
-  def lz(x : _); end
+  def apply(x : _); end
 
   def fix
     @size = (@left.try(&.size) || 0) + (@right.try(&.size) || 0) + 1
     @height = {@left.try(&.height) || 0, @right.try(&.height) || 0}.max + 1
     self
   end
-
-  def first
-    left.try(&.first) || self
-  end
-
-  def last
-    right.try(&.last) || self
-  end
 end
 
-class LazyNode(T, F, K) < Node(T)
-  @val : K?; @acc : K?; @lazy : F?
-  property :val, :acc, :lazy
-
-  def initialize(@key : T, @size : Int32 = 1, @height : Int32 = 1, @val : K? = nil)
-  end
-
+class LazyNode(KeyType, Monoid) < Node(KeyType, Monoid)
   def propagate
     super
-    return unless lazy
+    return unless x = m.not_nil!.lazy
 
-    left.try &.lz(lazy)
-    right.try &.lz(lazy)
-    self.val = map(lazy.not_nil!, val)
-    self.lazy = nil
+    left.try &.apply(x)
+    right.try &.apply(x)
+    m.not_nil!.val = Monoid.map(x, m.not_nil!.val, 1)
+    m.not_nil!.lazy = nil
   end
 
   def fix
-    self.acc = op(left.try &.as(self).acc, op(right.try &.as(self).acc, val))
+    m.not_nil!.acc = Monoid.op(left.try &.m.not_nil!.acc, Monoid.op(right.try &.m.not_nil!.acc, m.not_nil!.val))
     super
   end
 
-  def lz(lz : F)
-    self.lazy = compose(lz, lazy)
-    self.acc = map(lz, acc)
+  def apply(x : _)
+    m.not_nil!.lazy = Monoid.compose(x, m.not_nil!.lazy)
+    m.not_nil!.acc = Monoid.map(x, m.not_nil!.acc, size)
   end
+end
 
-  # (val, acc) x (val, acc) = (val, acc) -> x・y
-  def op(x : K?, y : K?) : K?
+struct Monoid
+  alias K = Mint         # fix here
+  alias F = {Mint, Mint} # fix here
+  @val : K?; @acc : K?; @lazy : F?
+
+  property :val, :acc, :lazy
+
+  def initialize(@val = nil, @acc = nil, @lazy = nil); end
+
+  # val|acc x val|acc = val|acc -> x・y
+  def self.op(x : K?, y : K?) : K?
     return x || y if x.nil? || y.nil?
-    {x[0] + y[0], x[1] + y[1]}
+    x + y # fix here
   end
 
-  # lazy x (val, acc) = (val, acc) -> f(x)
-  def map(f : F, x : K?) : K
-    return {Mint.new(f[1]), 1} unless x
-    {f[0] * x[0] + f[1] * x[1], x[1]}
+  # lazy x val|acc = val|acc -> f(x)
+  def self.map(f : F, x : K?, size : Int32) : K?
+    return Mint.new(f[1]) unless x
+    f[0] * x + f[1] * size # fix here
   end
 
   # lazy x lazy = lazy -> f・g
-  def compose(f : F, g : F?) : F
+  def self.compose(f : F, g : F?) : F?
     return f unless g
-    {f[0] * g[0], f[0] * g[1] + f[1]}
+    {f[0] * g[0], f[0] * g[1] + f[1]} # fix here
   end
 end
 
