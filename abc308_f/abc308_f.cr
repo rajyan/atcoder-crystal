@@ -3,7 +3,7 @@ p = read_line.split.map(&.to_i).sort
 l = read_line.split.map(&.to_i)
 d = read_line.split.map(&.to_i)
 
-tree = RBST(Int32).new(p)
+tree = RBST(Int32, Nil).new(p)
 ans = p.map(&.to_i64).sum
 ld = l.zip(d).sort_by { |(l, d)| -d }
 ld.each do |(l, d)|
@@ -15,16 +15,17 @@ end
 
 puts ans
 
-class RBST(T)
-  @root : Node(T)? = nil
+class RBST(KeyType, Monoid)
+  @root : Node(KeyType, Monoid)? = nil
   getter :root
-  @comp : (T, T) -> Bool = ->(a : T, b : T) { a > b }
+  @comp : (KeyType, KeyType) -> Bool = ->(a : KeyType, b : KeyType) { a > b }
+  @@rand = Random.new
 
-  def initialize(a : Array(T) = [] of T, &@comp : (T, T) -> Bool)
+  def initialize(a : Array(KeyType) = [] of KeyType, &@comp : (KeyType, KeyType) -> Bool)
     a.each { |e| insert(e) }
   end
 
-  def initialize(a : Array(T) = [] of T, @comp = ->(a : T, b : T) { a > b })
+  def initialize(a : Array(KeyType) = [] of KeyType, @comp = ->(a : KeyType, b : KeyType) { a > b })
     a.each { |e| insert(e) }
   end
 
@@ -36,58 +37,83 @@ class RBST(T)
     @root.try(&.height) || 0
   end
 
-  def insert(v : T, node : Pointer(Node(T)?) = pointerof(@root)) : Node(T)
-    return node.value = Node(T).new(v) unless node
-
-    left, right = split(node.value, rank(v))
-    node.value = merge(merge(left, Node(T).new(v)), right).not_nil!
+  def insert(v : KeyType)
+    @root = insert(v, @root)
   end
 
-  def <<(v : T)
+  def insert(v : KeyType, node : Node(KeyType, Monoid)?) : Node(KeyType, Monoid)
+    return Node(KeyType, Monoid).new(v) unless node
+
+    left, right = split(node, rank(v))
+    merge(merge(left, Node(KeyType, Monoid).new(v)), right).not_nil!
+  end
+
+  def insert(n : Node(KeyType, Monoid)) : Node(KeyType, Monoid)
+    return @root = n unless @root
+
+    left, right = split(@root, rank(n.key))
+    @root = merge(merge(left, n), right).not_nil!
+  end
+
+  def <<(v : KeyType)
     insert(v)
   end
 
-  def delete(v : T, node : Pointer(Node(T)?) = pointerof(@root)) : Node(T)?
+  def delete(v : KeyType)
+    @root = delete(v, @root)
+  end
+
+  def delete(v : KeyType, node : Node(KeyType, Monoid)?) : Node(KeyType, Monoid)?
     return nil unless node
 
-    left, mid = split(node.value, rank(v))
+    left, mid = split(node, rank(v))
     w, right = split(mid, 1)
-    return node.value = merge(left, merge(mid, right)) if w.try(&.key) != v
-    node.value = merge(left, right)
+    return nil if w.try(&.key) != v
+    merge(left, right)
   end
 
   def clear
     @root = nil
   end
 
-  def search(v : T, node : Pointer(Node(T)?) = pointerof(@root)) : Node(T)?
+  def first(node : Node(KeyType, Monoid)?)
+    return nil unless node
+    first(node.left) || node
+  end
+
+  def last(node : Node(KeyType, Monoid)?)
+    return nil unless node
+    last(node.right) || node
+  end
+
+  def search(v : KeyType, node : Pointer(Node(KeyType, Monoid)?) = pointerof(@root)) : Node(KeyType, Monoid)?
     n = nth(rank(v), node)
     n.try(&.key) == v ? n : nil
   end
 
-  def lower_than(v : T, node : Pointer(Node(T)?) = pointerof(@root)) : Node(T)?
+  def lower_than(v : KeyType, node : Pointer(Node(KeyType, Monoid)?) = pointerof(@root)) : Node(KeyType, Monoid)?
     left, right = split(node.value, rank(v))
-    ret = left.try(&.last)
+    ret = last(left)
     node.value = merge(left, right) # restore
     ret
   end
 
-  def <(v : T)
+  def <(v : KeyType)
     lower_than(v)
   end
 
-  def higher_than(v : T, node : Pointer(Node(T)?) = pointerof(@root)) : Node(T)?
+  def higher_than(v : KeyType, node : Pointer(Node(KeyType, Monoid)?) = pointerof(@root)) : Node(KeyType, Monoid)?
     left, right = split(node.value, rank(v))
-    ret = right.try(&.first)
+    ret = first(right)
     node.value = merge(left, right) # restore
     ret
   end
 
-  def >=(v : T)
+  def >=(v : KeyType)
     higher_than(v)
   end
 
-  def rank(v : T, node : Node(T) = @root) : Int32
+  def rank(v : KeyType, node : Node(KeyType, Monoid)? = @root)
     idx = 0
     until node.nil?
       node = if @comp.call(v, node.key)
@@ -100,12 +126,14 @@ class RBST(T)
     idx
   end
 
-  def nth(n : Int32, node : Pointer(Node(T)?) = pointerof(@root)) : Node(T)?
+  def nth(n : Int32, node : Pointer(Node(KeyType, Monoid)?) = pointerof(@root)) : Node(KeyType, Monoid)?
     range(n, n + 1, node)
   end
 
-  def range(l : Int32, r : Int32, node : Pointer(Node(T)?) = pointerof(@root))
+  # returned node's left, right property is not safe to use
+  def range(l : Int32, r : Int32, node : Pointer(Node(KeyType, Monoid)?) = pointerof(@root))
     return nil unless node
+
     mid, right = split(node.value, r)
     left, mid = split(mid, l)
     ret = mid.dup
@@ -122,10 +150,11 @@ class RBST(T)
   end
 
   # {[0...k], [k...n]}
-  def split(node : Node(T)?, k : Int32) : {Node(T)?, Node(T)?}
+  def split(node : Node(KeyType, Monoid)?, k : Int32) : {Node(KeyType, Monoid)?, Node(KeyType, Monoid)?}
     return {nil, nil} unless node
     raise IndexError.new("k: #{k} is out of tree range") unless 0 <= k <= node.size
 
+    node.propagate
     sz = node.left.try(&.size) || 0
     if k <= sz
       left, right = split(node.left, k)
@@ -138,11 +167,12 @@ class RBST(T)
     end
   end
 
-  def merge(left : Node(T)?, right : Node(T)?) : Node(T)?
-    return right unless left
-    return left unless right
+  def merge(left : Node(KeyType, Monoid)?, right : Node(KeyType, Monoid)?) : Node(KeyType, Monoid)?
+    return right || left if right.nil? || left.nil?
+    left.propagate
+    right.propagate
 
-    if rand(left.size + right.size) < left.size
+    if @@rand.rand(left.size + right.size) < left.size
       left.right = merge(left.right, right)
       left.fix
     else
@@ -150,34 +180,31 @@ class RBST(T)
       right.fix
     end
   end
+
+  def apply(l : Int32, r : Int32, x : _, node : Pointer(Node(KeyType, Monoid)?) = pointerof(@root))
+    mid, right = split(node.value, r)
+    left, mid = split(mid, l)
+    mid.try &.apply(x)
+    node.value = merge(merge(left, mid), right) # restore
+  end
 end
 
-class Node(T)
-  @left : Node(T)?
-  @right : Node(T)?
+class Node(KeyType, Monoid)
+  @left : Node(KeyType, Monoid)?
+  @right : Node(KeyType, Monoid)?
 
-  property :left, :right
+  property :left, :right, :m
   getter :key, :size, :height
 
-  def initialize(@key : T, @size : Int32 = 1, @height : Int32 = 1); end
+  def initialize(@key : KeyType, @m : Monoid? = nil, @size : Int32 = 1, @height : Int32 = 1); end
+
+  def propagate; end
+
+  def apply(x : _); end
 
   def fix
     @size = (@left.try(&.size) || 0) + (@right.try(&.size) || 0) + 1
     @height = {@left.try(&.height) || 0, @right.try(&.height) || 0}.max + 1
     self
-  end
-
-  def dup
-    n = Node(T).new(key, size, height)
-    n.left, n.right = left.dup, right.dup
-    n
-  end
-
-  def first
-    left.try(&.first) || self
-  end
-
-  def last
-    right.try(&.last) || self
   end
 end
