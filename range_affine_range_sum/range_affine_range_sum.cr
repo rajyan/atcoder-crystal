@@ -1,8 +1,8 @@
 n, q = read_line.split.map(&.to_i)
 a = read_line.split.map(&.to_i)
 
-rbst = RBST(Int32, Monoid).new
-a.each_with_index { |a, i| rbst.insert(LazyNode(Int32, Monoid).new(key: i, m: Monoid.new(val: Mint.new(a)))) }
+rbst = LazyRBST(Monoid).new
+a.each_with_index { |a, i| rbst.insert(i, Monoid.new(Mint.new(a))) }
 
 q.times do |i|
   query = read_line.split.map(&.to_i)
@@ -15,19 +15,10 @@ q.times do |i|
   end
 end
 
-class RBST(KeyType, Monoid)
-  @root : Node(KeyType, Monoid)? = nil
-  getter :root
-  @comp : (KeyType, KeyType) -> Bool = ->(a : KeyType, b : KeyType) { a > b }
+class LazyRBST(Monoid)
   @@rand = Random.new
-
-  def initialize(a : Array(KeyType) = [] of KeyType, &@comp : (KeyType, KeyType) -> Bool)
-    a.each { |e| insert(e) }
-  end
-
-  def initialize(a : Array(KeyType) = [] of KeyType, @comp = ->(a : KeyType, b : KeyType) { a > b })
-    a.each { |e| insert(e) }
-  end
+  @root : LazyNode(Monoid)? = nil
+  getter :root
 
   def size
     @root.try(&.size) || 0
@@ -37,102 +28,28 @@ class RBST(KeyType, Monoid)
     @root.try(&.height) || 0
   end
 
-  def insert(v : KeyType)
-    @root = insert(v, @root)
+  def insert(k : Int32, monoid : Monoid, node : Pointer(LazyNode(Monoid)?) = pointerof(@root)) : LazyNode(Monoid)
+    return node.value = LazyNode(Monoid).new(monoid) unless node.value
+
+    left, right = split(node.value, k)
+    node.value = merge(merge(left, LazyNode(Monoid).new(monoid)), right).not_nil!
   end
 
-  def insert(v : KeyType, node : Node(KeyType, Monoid)?) : Node(KeyType, Monoid)
-    return Node(KeyType, Monoid).new(v) unless node
+  def delete(k : Int32, node : Pointer(LazyNode(Monoid)?) = pointerof(@root)) : LazyNode(Monoid)?
+    return unless node.value
 
-    left, right = split(node, rank(v))
-    merge(merge(left, Node(KeyType, Monoid).new(v)), right).not_nil!
-  end
-
-  def insert(n : Node(KeyType, Monoid)) : Node(KeyType, Monoid)
-    return @root = n unless @root
-
-    left, right = split(@root, rank(n.key))
-    @root = merge(merge(left, n), right).not_nil!
-  end
-
-  def <<(v : KeyType)
-    insert(v)
-  end
-
-  def delete(v : KeyType)
-    @root = delete(v, @root)
-  end
-
-  def delete(v : KeyType, node : Node(KeyType, Monoid)?) : Node(KeyType, Monoid)?
-    return nil unless node
-
-    left, mid = split(node, rank(v))
+    left, mid = split(node.value, k)
     w, right = split(mid, 1)
-    return nil if w.try(&.key) != v
-    merge(left, right)
+    node.value = merge(left, right)
   end
 
-  def clear
-    @root = nil
-  end
-
-  def first(node : Node(KeyType, Monoid)?)
-    return nil unless node
-    first(node.left) || node
-  end
-
-  def last(node : Node(KeyType, Monoid)?)
-    return nil unless node
-    last(node.right) || node
-  end
-
-  def search(v : KeyType, node : Pointer(Node(KeyType, Monoid)?) = pointerof(@root)) : Node(KeyType, Monoid)?
-    n = nth(rank(v), node)
-    n.try(&.key) == v ? n : nil
-  end
-
-  def lower_than(v : KeyType, node : Pointer(Node(KeyType, Monoid)?) = pointerof(@root)) : Node(KeyType, Monoid)?
-    left, right = split(node.value, rank(v))
-    ret = last(left)
-    node.value = merge(left, right) # restore
-    ret
-  end
-
-  def <(v : KeyType)
-    lower_than(v)
-  end
-
-  def higher_than(v : KeyType, node : Pointer(Node(KeyType, Monoid)?) = pointerof(@root)) : Node(KeyType, Monoid)?
-    left, right = split(node.value, rank(v))
-    ret = first(right)
-    node.value = merge(left, right) # restore
-    ret
-  end
-
-  def >=(v : KeyType)
-    higher_than(v)
-  end
-
-  def rank(v : KeyType, node : Node(KeyType, Monoid)? = @root)
-    idx = 0
-    until node.nil?
-      node = if @comp.call(v, node.key)
-               idx += (node.left.try(&.size) || 0) + 1
-               node.right
-             else
-               node.left
-             end
-    end
-    idx
-  end
-
-  def nth(n : Int32, node : Pointer(Node(KeyType, Monoid)?) = pointerof(@root)) : Node(KeyType, Monoid)?
+  def nth(n : Int32, node : Pointer(LazyNode(Monoid)?) = pointerof(@root)) : LazyNode(Monoid)?
     range(n, n + 1, node)
   end
 
   # returned node's left, right property is not safe to use
-  def range(l : Int32, r : Int32, node : Pointer(Node(KeyType, Monoid)?) = pointerof(@root))
-    return nil unless node
+  def range(l : Int32, r : Int32, node : Pointer(LazyNode(Monoid)?) = pointerof(@root))
+    return unless node.value
 
     mid, right = split(node.value, r)
     left, mid = split(mid, l)
@@ -150,7 +67,7 @@ class RBST(KeyType, Monoid)
   end
 
   # {[0...k], [k...n]}
-  def split(node : Node(KeyType, Monoid)?, k : Int32) : {Node(KeyType, Monoid)?, Node(KeyType, Monoid)?}
+  def split(node : LazyNode(Monoid)?, k : Int32) : {LazyNode(Monoid)?, LazyNode(Monoid)?}
     return {nil, nil} unless node
     raise IndexError.new("k: #{k} is out of tree range") unless 0 <= k <= node.size
 
@@ -167,7 +84,7 @@ class RBST(KeyType, Monoid)
     end
   end
 
-  def merge(left : Node(KeyType, Monoid)?, right : Node(KeyType, Monoid)?) : Node(KeyType, Monoid)?
+  def merge(left : LazyNode(Monoid)?, right : LazyNode(Monoid)?) : LazyNode(Monoid)?
     return right || left if right.nil? || left.nil?
     left.propagate
     right.propagate
@@ -181,68 +98,75 @@ class RBST(KeyType, Monoid)
     end
   end
 
-  def apply(l : Int32, r : Int32, x : _, node : Pointer(Node(KeyType, Monoid)?) = pointerof(@root))
+  def apply(l : Int32, r : Int32, x : _ = nil, node : Pointer(LazyNode(Monoid)?) = pointerof(@root))
     mid, right = split(node.value, r)
     left, mid = split(mid, l)
     mid.try &.apply(x)
     node.value = merge(merge(left, mid), right) # restore
   end
-end
 
-class Node(KeyType, Monoid)
-  @left : Node(KeyType, Monoid)?
-  @right : Node(KeyType, Monoid)?
-
-  property :left, :right, :m
-  getter :key, :size, :height
-
-  def initialize(@key : KeyType, @m : Monoid? = nil, @size : Int32 = 1, @height : Int32 = 1); end
-
-  def propagate; end
-
-  def apply(x : _); end
-
-  def fix
-    @size = (@left.try(&.size) || 0) + (@right.try(&.size) || 0) + 1
-    @height = {@left.try(&.height) || 0, @right.try(&.height) || 0}.max + 1
-    self
+  def reverse(l : Int32, r : Int32, node : Pointer(LazyNode(Monoid)?) = pointerof(@root))
+    apply(l, r, nil, node)
   end
 end
 
-class LazyNode(KeyType, Monoid) < Node(KeyType, Monoid)
+class LazyNode(Monoid)
+  @left : LazyNode(Monoid)?
+  @right : LazyNode(Monoid)?
+  @rev = false
+  @size = 1
+  @height = 1
+
+  property :left, :right
+  getter :size, :height, :rev, :m
+
+  def initialize(@m : Monoid = Monoid.new); end
+
   def propagate
-    super
-    return unless x = m.not_nil!.lazy
+    if rev
+      @rev = false
+      @left, @right = right, left
+      @left.try &.reverse
+      @right.try &.reverse
+    end
 
-    left.try &.apply(x)
-    right.try &.apply(x)
-    m.not_nil!.val = Monoid.map(x, m.not_nil!.val, 1)
-    m.not_nil!.lazy = nil
+    return unless x = m.lazy
+    @left.try &.apply(x)
+    @right.try &.apply(x)
+    @m.lazy = nil
   end
 
   def fix
-    m.not_nil!.acc = Monoid.op(left.try &.m.not_nil!.acc, Monoid.op(right.try &.m.not_nil!.acc, m.not_nil!.val))
-    super
+    @size = (left.try(&.size) || 0) + (right.try(&.size) || 0) + 1
+    @height = {left.try(&.height) || 0, right.try(&.height) || 0}.max + 1
+    @m.acc = Monoid.op(Monoid.op(m.val, left.try &.m.acc), right.try &.m.acc)
+    self
   end
 
   def apply(x : _)
-    m.not_nil!.lazy = Monoid.compose(x, m.not_nil!.lazy)
-    m.not_nil!.acc = Monoid.map(x, m.not_nil!.acc, size)
+    return reverse unless x
+    @m.lazy = Monoid.compose(x, m.lazy)
+    @m.val = Monoid.map(x, m.val, 1)
+    @m.acc = Monoid.map(x, m.acc, size)
+  end
+
+  def reverse
+    @rev = rev ^ true
   end
 end
 
 struct Monoid
   alias K = Mint         # fix here
   alias F = {Mint, Mint} # fix here
-  @val : K?; @acc : K?; @lazy : F?
 
+  @val : K; @acc : K; @lazy : F?
   property :val, :acc, :lazy
 
-  def initialize(@val = nil, @acc = nil, @lazy = nil); end
+  def initialize(@val, @acc = val); end
 
   # val|acc x val|acc = val|acc -> x・y
-  def self.op(x : K?, y : K?) : K?
-    return x || y if x.nil? || y.nil?
+  def self.op(x : K, y : K?) : K
+    return x unless y
     x + y # fix here
   end
 
