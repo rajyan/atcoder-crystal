@@ -1,2 +1,7 @@
-.idea/
+/docs/
+/lib/
+/bin/
+/.shards/
+*.dwarf
+.idea
 **/test/*

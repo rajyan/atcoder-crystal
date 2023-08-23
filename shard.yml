@@ -1,0 +1,14 @@
+name: atcoder-crystal
+version: 0.1.0
+
+authors:
+  - Yohta Kimura <kitakita7617@gmail.com>
+
+dependencies:
+  atcoder:
+    github: google/ac-library.cr
+    branch: master
+
+crystal: 1.8.2
+
+license: MIT
