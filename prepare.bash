@@ -1,10 +1,11 @@
 #!/bin/bash -eux
 
 url="$1"
-dir="${url##*/}"
-file="$dir.cr"
+task="${url##*/}"
+dir="src/$task"
+file="$task.cr"
 
-mkdir "$dir"
+mkdir -p "$dir"
 pushd "$dir"
 touch "$file"
 rmine "$PWD/$file"
